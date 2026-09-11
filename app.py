@@ -13,7 +13,8 @@ def calculate_priority(condition: str, battery: int) -> float:
     severity_weights = {
         "Trapped under debris": 50.0,
         "Medical Emergency": 40.0,
-        "Cut off by floodwater": 25.0
+        "Cut off by floodwater": 25.0,
+        "Trapped in a fire": 35.0
     }
     base_score = severity_weights.get(condition, 10.0)
 

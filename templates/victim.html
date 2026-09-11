@@ -3,102 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RescuNet - Victim Emergency SOS</title>
+    <title>RescuNet - Emergency SOS</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 20px; }
-        .card { max-width: 400px; margin: 0 auto; background: #111; padding: 20px; border-radius: 12px; border: 1px solid #333; }
-        h1 { color: #ff4d4d; margin-bottom: 5px; }
-        select, input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; box-sizing: border-box; font-size: 16px; }
-        .sos-btn { background: #ff3333; color: #fff; padding: 20px; border: none; font-size: 20px; font-weight: bold; border-radius: 10px; width: 100%; cursor: pointer; margin-top: 10px; box-shadow: 0 0 15px rgba(255,51,51,0.5); }
-        .sos-btn:active { background: #b30000; }
-        #status-box { margin-top: 15px; font-weight: bold; font-size: 14px; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        .container { max-width: 400px; margin: auto; }
+        h1 { color: #ff4d4d; }
+        input, select {
+            width: 100%; padding: 12px; margin: 8px 0;
+            box-sizing: border-box; border-radius: 6px; border: 1px solid #444;
+            background: #222; color: white; font-size: 16px;
+        }
+        .sos-btn {
+            background-color: #ff3333;
+            color: white; border: none; padding: 25px; width: 100%;
+            font-size: 24px; font-weight: bold; border-radius: 12px;
+            cursor: pointer; margin-top: 15px;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.6);
+        }
+        .sos-btn:active { background-color: #b30000; }
+        #status { margin-top: 20px; font-weight: bold; font-size: 18px; }
     </style>
 </head>
 <body>
-    <div class="card">
+    <div class="container">
         <h1>🚨 RescuNet SOS</h1>
-        <p style="color:#aaa; font-size: 14px;">Peer-to-Peer Distress Beacon</p>
+        <p>Press the button to broadcast your location to search-and-rescue teams.</p>
 
-        <input type="text" id="victim-name" value="Victim 1" placeholder="Name">
-        <select id="victim-condition">
+        <input type="text" id="name" placeholder="Your Name" value="Victim 1">
+        <select id="condition">
             <option value="Trapped under debris">Trapped under debris</option>
             <option value="Medical Emergency">Medical Emergency</option>
             <option value="Cut off by floodwater">Cut off by floodwater</option>
         </select>
 
-        <button class="sos-btn" onclick="dispatchSOS()">TRANSMIT SOS</button>
-        <div id="status-box"></div>
+        <button class="sos-btn" onclick="sendSOS()">SEND EMERGENCY SOS</button>
+        <div id="status"></div>
     </div>
 
     <script>
-        // Automatically listen for network reconnect and flush the offline buffer
-window.addEventListener('online', () => {
-    const cachedSOS = localStorage.getItem('cached_sos');
-    if (cachedSOS) {
-        fetch('/api/sos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: cachedSOS
-        })
-        .then(res => res.json())
-        .then(() => {
-            localStorage.removeItem('cached_sos');
-            const status = document.getElementById('status-box');
-            status.innerText = "⚡ Connection restored! P2P Buffer flushed to Command Center.";
-            status.style.color = "#00ff66";
-        });
-    }
-});
-        async function dispatchSOS() {
-            const status = document.getElementById('status-box');
-            status.innerText = "Gathering telemetry (GPS & Battery)...";
-            status.style.color = "#ffcc00";
-
-            let batteryLevel = 85;
-            if (navigator.getBattery) {
-                try {
-                    const bat = await navigator.getBattery();
-                    batteryLevel = Math.round(bat.level * 100);
-                } catch(e) {}
-            }
+        function sendSOS() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerText = "Acquiring GPS coordinates...";
+            statusDiv.style.color = "#ffcc00";
 
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => sendPayload(pos.coords.latitude, pos.coords.longitude, batteryLevel),
-                    () => sendPayload(10.053, 76.627, batteryLevel) // Default coordinate fallback
+                    (position) => {
+                        const payload = {
+                            name: document.getElementById('name').value,
+                            condition: document.getElementById('condition').value,
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            time: new Date().toLocaleTimeString()
+                        };
+                        dispatchSignal(payload);
+                    },
+                    (error) => {
+                        alert("GPS unavailable or denied. Sending simulated location for testing.");
+                        // Default testing location if real GPS is disabled
+                        const payload = {
+                            name: document.getElementById('name').value,
+                            condition: document.getElementById('condition').value,
+                            lat: 10.053,
+                            lng: 76.627,
+                            time: new Date().toLocaleTimeString()
+                        };
+                        dispatchSignal(payload);
+                    }
                 );
-            } else {
-                sendPayload(10.053, 76.627, batteryLevel);
             }
         }
 
-        function sendPayload(lat, lng, battery) {
-            const payload = {
-                name: document.getElementById('victim-name').value,
-                condition: document.getElementById('victim-condition').value,
-                lat: lat,
-                lng: lng,
-                battery: battery,
-                time: new Date().toLocaleTimeString()
-            };
-
+        function dispatchSignal(payload) {
             fetch('/api/sos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
             .then(res => res.json())
-            .then(() => {
-                const status = document.getElementById('status-box');
-                status.innerText = "✅ SOS SIGNAL DISPATCHED TO DASHBOARD";
-                status.style.color = "#00ff66";
+            .then(data => {
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerText = "✅ SOS SIGNAL BROADCASTED!";
+                statusDiv.style.color = "#00ff66";
             })
-            .catch(() => {
-                // Offline fallback: cache to localStorage
-                localStorage.setItem('cached_sos', JSON.stringify(payload));
-                const status = document.getElementById('status-box');
-                status.innerText = "⚠️ Network isolated. Packet stored in local P2P buffer!";
-                status.style.color = "#ff9900";
+            .catch(err => {
+
+                document.getElementById('status').innerText = "❌ Network error sending SOS.";
             });
         }
     </script>

@@ -59,6 +59,13 @@
                             .bindPopup(`<b>${ping.name}</b><br>Status: ${ping.condition}<br>Priority Score: ${ping.priority}<br>Battery: ${ping.battery}%`);
                         activeMarkers.push(marker);
 
+                        const marker = L.marker([ping.lat, ping.lng]).addTo(map)
+        .bindPopup(`<b>${ping.name}</b><br>Status: ${ping.condition}<br>Priority Score: ${ping.priority}<br>Battery: ${ping.battery}%`)
+        .bindTooltip(`<b>${ping.name}</b><br><small>${ping.condition}</small>`, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -10],
+
                         // Append Card to Sidebar Queue
                         const card = document.createElement('div');
                         card.className = 'triage-card';
