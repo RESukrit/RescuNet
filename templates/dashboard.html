@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RescuNet - Rescue Operations Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: -apple-system, sans-serif; display: flex; height: 100vh; background: #111; color: #fff; }
+        #sidebar { width: 360px; background: #1a1a1a; padding: 15px; box-sizing: border-box; overflow-y: auto; border-right: 1px solid #333; }
+        #map { flex-grow: 1; height: 100vh; }
+        .triage-card { background: #262626; border-left: 5px solid #ff3333; padding: 12px; margin-bottom: 10px; border-radius: 4px; }
+        .score-tag { float: right; background: #ff3333; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>🚨 Priority Triage Queue</h2>
+        <div id="triage-feed">Scanning for distress beacons...</div>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([10.053, 76.627], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let activeMarkers = [];
+
+        // Load Hazard Zone Boundary Overlay
+        fetch('/api/hazards')
+            .then(res => res.json())
+            .then(hazardData => {
+                L.geoJSON(hazardData, {
+                    style: { color: "#ff0000", weight: 2, fillColor: "#ff0000", fillOpacity: 0.3 }
+                }).addTo(map);
+            });
+
+        function syncDashboard() {
+            fetch('/api/sos')
+                .then(res => res.json())
+                .then(signals => {
+                    activeMarkers.forEach(m => map.removeLayer(m));
+                    activeMarkers = [];
+
+                    const feed = document.getElementById('triage-feed');
+                    feed.innerHTML = '';
+
+                    if (signals.length === 0) {
+                        feed.innerHTML = '<p style="color:#888;">No active emergency signals detected.</p>';
+                        return;
+                    }
+
+                    signals.forEach((ping) => {
+                        // Plot Marker on Leaflet Map
+                        const marker = L.marker([ping.lat, ping.lng]).addTo(map)
+                            .bindPopup(`<b>${ping.name}</b><br>Status: ${ping.condition}<br>Priority Score: ${ping.priority}<br>Battery: ${ping.battery}%`);
+                        activeMarkers.push(marker);
+
+                        // Append Card to Sidebar Queue
+                        const card = document.createElement('div');
+                        card.className = 'triage-card';
+                        card.innerHTML = `
+                            <span class="score-tag">Score: ${ping.priority}</span>
+                            <strong>${ping.name}</strong><br>
+                            <small style="color:#ff6666;">${ping.condition}</small><br>
+                            <small style="color:#aaa;">Battery: ${ping.battery}% | Time: ${ping.time}</small>
+                        `;
+                        feed.appendChild(card);
+                    });
+                });
+        }
+
+        setInterval(syncDashboard, 2000);
+        syncDashboard();
+    </script>
+</body>
+</html>

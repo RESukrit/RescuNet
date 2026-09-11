@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Active Hazard Zone", "type": "Flood/Landslide" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [76.620, 10.048],
+          [76.635, 10.048],
+          [76.635, 10.058],
+          [76.620, 10.058],
+          [76.620, 10.048]
+        ]]
+      }
+    }
+  ]
+}
