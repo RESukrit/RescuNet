@@ -2,26 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>RescuNet - Rescue Operations Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RescuNet Command Dashboard</title>
+    <!-- Leaflet CSS CDN -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: -apple-system, sans-serif; display: flex; height: 100vh; background: #111; color: #fff; }
-        #sidebar { width: 360px; background: #1a1a1a; padding: 15px; box-sizing: border-box; overflow-y: auto; border-right: 1px solid #333; }
-        #map { flex-grow: 1; height: 100vh; }
-        .triage-card { background: #262626; border-left: 5px solid #ff3333; padding: 12px; margin-bottom: 10px; border-radius: 4px; }
-        .score-tag { float: right; background: #ff3333; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; display: flex; height: 100vh; background: #121212; color: #e0e0e0; }
+        #sidebar { width: 380px; background: #1e1e1e; padding: 20px; overflow-y: auto; border-right: 1px solid #333; display: flex; flex-direction: column; gap: 15px; }
+        #map { flex-grow: 1; height: 100vh; background: #222; }
+        .triage-card { background: #2a2a2a; border-left: 5px solid #ff3333; padding: 15px; border-radius: 6px; }
+        .badge { float: right; background: #ff3333; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .card-title { font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 5px; }
+        .card-sub { font-size: 13px; color: #ff6666; font-weight: 600; margin-bottom: 5px; }
+        .card-meta { font-size: 12px; color: #aaa; }
+        .status-scanning { font-size: 14px; color: #888; text-align: center; margin-top: 20px; }
     </style>
 </head>
 <body>
+
     <div id="sidebar">
-        <h2>🚨 Priority Triage Queue</h2>
-        <div id="triage-feed">Scanning for distress beacons...</div>
+        <h2>🚨 Command Dashboard</h2>
+        <div id="triage-feed">
+            <div class="status-scanning">Scanning for distress beacons...</div>
+        </div>
     </div>
+
     <div id="map"></div>
 
+    <!-- Leaflet JS CDN -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const map = L.map('map').setView([10.053, 76.627], 14);
+        // Initialize Map
+        const map = L.map('map').setView([10.053, 76.627], 13);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
@@ -29,55 +42,64 @@
 
         let activeMarkers = [];
 
-        // Load Hazard Zone Boundary Overlay
-        fetch('/api/hazards')
-            .then(res => res.json())
-            .then(hazardData => {
-                L.geoJSON(hazardData, {
-                    style: { color: "#ff0000", weight: 2, fillColor: "#ff0000", fillOpacity: 0.3 }
-                }).addTo(map);
-            });
-
         function syncDashboard() {
-            fetch('/api/sos')
-                .then(res => res.json())
-                .then(signals => {
-                    activeMarkers.forEach(m => map.removeLayer(m));
-                    activeMarkers = [];
+            fetch('/api/sos', {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Server returned HTTP " + res.status);
+                return res.json();
+            })
+            .then(signals => {
+                console.log("Signals fetched from backend:", signals);
 
-                    const feed = document.getElementById('triage-feed');
-                    feed.innerHTML = '';
+                // Clear previous map markers
+                activeMarkers.forEach(m => map.removeLayer(m));
+                activeMarkers = [];
 
-                    if (signals.length === 0) {
-                        feed.innerHTML = '<p style="color:#888;">No active emergency signals detected.</p>';
-                        return;
-                    }
+                const feed = document.getElementById('triage-feed');
+                feed.innerHTML = '';
 
-                    signals.forEach((ping) => {
-                        // Plot Marker on Leaflet Map
-                        const marker = L.marker([ping.lat, ping.lng]).addTo(map)
-                            .bindPopup(`<b>${ping.name}</b><br>Status: ${ping.condition}<br>Priority Score: ${ping.priority}<br>Battery: ${ping.battery}%`);
-                        activeMarkers.push(marker);
+                if (!Array.isArray(signals) || signals.length === 0) {
+                    feed.innerHTML = '<div class="status-scanning">Scanning for distress beacons...</div>';
+                    return;
+                }
 
-                        const marker = L.marker([ping.lat, ping.lng]).addTo(map)
-        .bindPopup(`<b>${ping.name}</b><br>Status: ${ping.condition}<br>Priority Score: ${ping.priority}<br>Battery: ${ping.battery}%`)
-        .bindTooltip(`<b>${ping.name}</b><br><small>${ping.condition}</small>`, {
-            permanent: true,
-            direction: 'top',
-            offset: [0, -10],
+                // Center map on highest priority signal
+                map.panTo([signals[0].lat, signals[0].lng]);
 
-                        // Append Card to Sidebar Queue
-                        const card = document.createElement('div');
-                        card.className = 'triage-card';
-                        card.innerHTML = `
-                            <span class="score-tag">Score: ${ping.priority}</span>
-                            <strong>${ping.name}</strong><br>
-                            <small style="color:#ff6666;">${ping.condition}</small><br>
-                            <small style="color:#aaa;">Battery: ${ping.battery}% | Time: ${ping.time}</small>
-                        `;
-                        feed.appendChild(card);
+                signals.forEach((ping) => {
+                    // Create Map Marker
+                    const marker = L.marker([ping.lat, ping.lng]).addTo(map);
+
+                    marker.bindPopup(`
+                        <b>${ping.name}</b><br>
+                        <b>Condition:</b> ${ping.condition}<br>
+                        <b>Priority:</b> ${ping.priority}<br>
+                        <b>Battery:</b> ${ping.battery}%
+                    `);
+
+                    marker.bindTooltip(`<b>${ping.name}</b><br><small>${ping.condition}</small>`, {
+                        permanent: true,
+                        direction: 'top',
+                        offset: [0, -10]
                     });
+
+                    activeMarkers.push(marker);
+
+                    // Add Card to Sidebar
+                    const card = document.createElement('div');
+                    card.className = 'triage-card';
+                    card.innerHTML = `
+                        <span class="badge">Score: ${ping.priority}</span>
+                        <div class="card-title">${ping.name}</div>
+                        <div class="card-sub">${ping.condition}</div>
+                        <div class="card-meta">Battery: ${ping.battery}% | Time: ${ping.time}</div>
+                    `;
+                    feed.appendChild(card);
                 });
+            })
+            .catch(err => console.error("Dashboard sync error:", err));
         }
 
         setInterval(syncDashboard, 2000);
