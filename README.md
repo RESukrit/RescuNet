@@ -1,6 +1,6 @@
 # 🚨 RescuNet
 
-> **Hackathon Prototype** | Intelligent disaster management & offline mesh communication when cell networks go down.
+Intelligent disaster management & offline mesh communication when cell networks go down.
 
 ---
 
